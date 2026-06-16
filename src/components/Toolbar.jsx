@@ -87,7 +87,7 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
             <VscNewFolder /> <span>New Folder</span>
           </button>
           <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Upload files">
-            <VscUpload /> <span>Upload</span>
+            <VscCloudUpload /> <span>Upload</span>
           </button>
           <input
             ref={fileInputRef}
