@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import { useFiles } from '../context/FileContext.jsx';
-import { useTheme } from '../context/ThemeContext.jsx';
-import { VscFiles, VscFolder, VscCloudDownload, VscSettingsGear } from 'react-icons/vsc';
+import { VscFiles, VscCloudDownload, VscDatabase, VscFolderOpened } from 'react-icons/vsc';
 
 export default function Sidebar({ open, onClose }) {
-  const { navigate, currentPath, downloadAll, vaultInfo } = useFiles();
-  const { theme } = useTheme();
-  const [showThemeModal, setShowThemeModal] = useState(false);
-
-  const quickFolders = [
-    { name: 'All Files', path: '/', icon: <VscFiles /> },
-  ];
+  const {
+    navigate, currentPath, downloadAll, vaultInfo,
+    storageMode, deviceName, switchToVault, openDeviceFolder,
+    isFileSystemSupported, isWebkitSupported
+  } = useFiles();
 
   const handleNav = (path) => {
     navigate(path);
@@ -36,39 +33,86 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         <nav className="sidebar-nav">
-          {quickFolders.map((folder) => (
-            <div
-              key={folder.path}
-              className={`nav-item ${currentPath === folder.path ? 'active' : ''}`}
-              onClick={() => handleNav(folder.path)}
-            >
-              <span className="nav-icon">{folder.icon}</span>
-              {folder.name}
-            </div>
-          ))}
+          {/* Vault Section */}
+          <div style={{ padding: '4px 12px 8px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-tertiary)' }}>
+            Storage
+          </div>
+
+          <div
+            className={`nav-item ${storageMode === 'vault' ? 'active' : ''}`}
+            onClick={() => { switchToVault(); onClose?.(); }}
+          >
+            <span className="nav-icon"><VscDatabase /></span>
+            My Vault
+          </div>
+
+          <div
+            className={`nav-item ${storageMode === 'device' ? 'active' : ''}`}
+            onClick={async () => {
+              if (isFileSystemSupported || isWebkitSupported) {
+                await openDeviceFolder();
+                onClose?.();
+              }
+            }}
+            title={isFileSystemSupported ? 'Open device folder' : 'Upload a folder from your device'}
+          >
+            <span className="nav-icon"><VscFolderOpened /></span>
+            {storageMode === 'device' ? deviceName || 'Device' : 'Browse Device'}
+          </div>
+
+          <div style={{ padding: '12px 12px 4px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-tertiary)', marginTop: 8 }}>
+            Quick Links
+          </div>
+
+          <div
+            className={`nav-item ${currentPath === '/' && storageMode === 'vault' ? 'active' : ''}`}
+            onClick={() => handleNav('/')}
+          >
+            <span className="nav-icon"><VscFiles /></span>
+            All Files
+          </div>
         </nav>
 
         <div className="sidebar-footer">
-          <div className="vault-info">
-            <div className="vault-stat">
-              <span>Files</span>
-              <span>{vaultInfo?.fileCount ?? 0}</span>
+          {storageMode === 'vault' && (
+            <div className="vault-info">
+              <div className="vault-stat">
+                <span>Files</span>
+                <span>{vaultInfo?.fileCount ?? 0}</span>
+              </div>
+              <div className="vault-stat">
+                <span>Folders</span>
+                <span>{vaultInfo?.folderCount ?? 0}</span>
+              </div>
+              <div className="vault-stat">
+                <span>Total Size</span>
+                <span>{formatSize(vaultInfo?.totalSize || 0)}</span>
+              </div>
             </div>
-            <div className="vault-stat">
-              <span>Folders</span>
-              <span>{vaultInfo?.folderCount ?? 0}</span>
-            </div>
-            <div className="vault-stat">
-              <span>Total Size</span>
-              <span>{formatSize(vaultInfo?.totalSize || 0)}</span>
-            </div>
-          </div>
+          )}
 
-          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-            <button className="tool-btn" onClick={downloadAll} title="Download entire vault as ZIP">
-              <VscCloudDownload /> Download Vault
-            </button>
-          </div>
+          {storageMode === 'device' && (
+            <div className="vault-info">
+              <div className="vault-stat">
+                <span>Source</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{deviceName || 'Device'}</span>
+              </div>
+            </div>
+          )}
+
+          {storageMode === 'vault' && (
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+              <button className="tool-btn" onClick={downloadAll} title="Download entire vault as ZIP">
+                <VscCloudDownload /> Download Vault
+              </button>
+            </div>
+          )}
+
+          {!isFileSystemSupported && !isWebkitSupported && storageMode === 'vault' && (
+            <div style={{ marginTop: 8, padding: '8px', fontSize: 11, color: 'var(--text-tertiary)', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: 6 }}>
+              Device browsing requires a browser that supports the File System Access API (Chrome/Edge).
+            </div>
+          )}
         </div>
       </aside>
     </>

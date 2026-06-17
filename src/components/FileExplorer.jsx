@@ -24,16 +24,44 @@ function formatDate(ts) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function FileExplorer({ onContextMenu, onOpenFolder }) {
+export default function FileExplorer({ onContextMenu }) {
   const {
     items, loading, error, currentPath, navigate,
     selectedItems, toggleSelect, selectAll, clearSelection,
     searchQuery, searchResults,
+    storageMode, navigateDeviceToSubfolder, navigateUploaded
   } = useFiles();
 
   const [viewMode, setViewMode] = useState('grid');
-  const displayItems = searchQuery.trim() ? searchResults : items;
+  const displayItems = searchQuery.trim() && storageMode === 'vault' ? searchResults : items;
 
+  const handleDoubleClick = (item) => {
+    if (item.type === 'folder') {
+      if (storageMode === 'vault') {
+        navigate(item.path);
+      } else if (storageMode === 'device') {
+        // If we have a handle (File System Access API), navigate into it
+        if (item.handle && item.handle.kind === 'directory') {
+          navigateDeviceToSubfolder(item.name);
+        } else if (item.children !== null && item.children !== undefined) {
+          // Uploaded directory tree fallback
+          navigateUploaded(item.path);
+        }
+      }
+    }
+  };
+
+  const handleClick = (e, item) => {
+    toggleSelect(item.path);
+  };
+
+  const handleContextMenu = (e, item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu(e, item);
+  };
+
+  // Loading skeleton
   if (loading) {
     return (
       <div className="file-explorer">
@@ -50,13 +78,14 @@ export default function FileExplorer({ onContextMenu, onOpenFolder }) {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="empty-state">
         <div className="empty-icon" style={{ color: 'var(--error)' }}>
           <VscTrash />
         </div>
-        <div className="empty-title">Error Loading Files</div>
+        <div className="empty-title">Error</div>
         <div className="empty-desc">{error}</div>
         <button className="tool-btn primary" onClick={() => navigate(currentPath)}>
           <VscRefresh /> Retry
@@ -65,39 +94,26 @@ export default function FileExplorer({ onContextMenu, onOpenFolder }) {
     );
   }
 
+  // Empty state
   if (displayItems.length === 0) {
-    const isSearching = searchQuery.trim().length > 0;
+    const isSearching = searchQuery.trim().length > 0 && storageMode === 'vault';
     return (
       <div className="empty-state">
-        <div className="empty-icon">{isSearching ? '🔍' : '📁'}</div>
+        <div className="empty-icon">{isSearching ? '🔍' : storageMode === 'device' ? '💻' : '📁'}</div>
         <div className="empty-title">
-          {isSearching ? 'No Results Found' : 'This Folder is Empty'}
+          {isSearching ? 'No Results Found' : storageMode === 'device' ? 'Select a folder to browse' : 'This Folder is Empty'}
         </div>
         <div className="empty-desc">
           {isSearching
             ? `No files match "${searchQuery}"`
-            : 'Upload files or create a new folder to get started.'
+            : storageMode === 'device'
+              ? 'Click "Browse Device" in the toolbar to pick a folder from your device.'
+              : 'Upload files or create a new folder to get started.'
           }
         </div>
       </div>
     );
   }
-
-  const handleDoubleClick = (item) => {
-    if (item.type === 'folder') {
-      navigate(item.path);
-    }
-  };
-
-  const handleClick = (e, item) => {
-    toggleSelect(item.path);
-  };
-
-  const handleContextMenu = (e, item) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onContextMenu(e, item);
-  };
 
   // Grid View
   if (viewMode === 'grid') {
@@ -128,7 +144,7 @@ export default function FileExplorer({ onContextMenu, onOpenFolder }) {
               onDoubleClick={() => handleDoubleClick(item)}
               onContextMenu={(e) => handleContextMenu(e, item)}
             >
-              <div className={`file-icon`}>
+              <div className="file-icon">
                 {item.type === 'folder' ? '📁' : '📄'}
               </div>
               <span className="file-name truncate" title={item.name}>{item.name}</span>
@@ -136,7 +152,7 @@ export default function FileExplorer({ onContextMenu, onOpenFolder }) {
                 <span className="file-info">{formatSize(item.size)}</span>
               )}
               {item.type === 'folder' && (
-                <span className="file-info">{formatSize(item.size)}</span>
+                <span className="file-info">Folder</span>
               )}
               <div className="checkbox">
                 {selectedItems.has(item.path) && '✓'}

@@ -3,15 +3,20 @@ import { useFiles } from '../context/FileContext.jsx';
 import Breadcrumb from './Breadcrumb.jsx';
 import {
   VscNewFolder, VscCloudUpload, VscRefresh, VscCloudDownload,
-  VscSettingsGear, VscMenu, VscTrash, VscEdit
+  VscSettingsGear, VscMenu, VscTrash, VscEdit,
+  VscFolderOpened, VscHome
 } from 'react-icons/vsc';
 import ThemeSwitcher from './ThemeSwitcher.jsx';
 
-export default function Toolbar({ onMenuToggle, selectedItem }) {
+export default function Toolbar({ onMenuToggle }) {
   const {
     items, currentPath, navigate, createFolder, uploadFiles, refresh,
-    download, downloadAll, delete: deleteItem, rename, selectedItems, clearSelection
+    download, downloadAll, delete: deleteItem, rename, selectedItems, clearSelection,
+    storageMode, openDeviceFolder, handleDirectoryUpload, switchToVault,
+    isFileSystemSupported, isWebkitSupported, deviceName,
+    navigateDeviceToSubfolder, navigateUploaded
   } = useFiles();
+
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -19,6 +24,7 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
   const [newFolderName, setNewFolderName] = useState('');
   const [renameName, setRenameName] = useState('');
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -35,6 +41,14 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
     const files = e.target.files;
     if (files?.length > 0) {
       uploadFiles(files);
+    }
+    e.target.value = '';
+  };
+
+  const handleFolderUpload = (e) => {
+    const files = e.target.files;
+    if (files?.length > 0) {
+      handleDirectoryUpload(files);
     }
     e.target.value = '';
   };
@@ -72,6 +86,16 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
     }
   };
 
+  const handleDeviceOpen = async () => {
+    if (isFileSystemSupported) {
+      await openDeviceFolder();
+    } else if (isWebkitSupported) {
+      folderInputRef.current?.click();
+    } else {
+      alert('Your browser does not support browsing device folders. Please use Chrome or Edge.');
+    }
+  };
+
   return (
     <>
       <div className="toolbar">
@@ -80,26 +104,59 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
             <VscMenu />
           </button>
           <Breadcrumb />
+
+          {/* Storage indicator */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '3px 10px', borderRadius: 12,
+            background: storageMode === 'device' ? 'var(--accent-light)' : 'var(--bg-secondary)',
+            color: storageMode === 'device' ? 'var(--accent)' : 'var(--text-tertiary)',
+            fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginLeft: 8
+          }}>
+            {storageMode === 'vault' ? '📦 VAULT' : `📂 ${deviceName?.toUpperCase() || 'DEVICE'}`}
+          </div>
         </div>
 
         <div className="toolbar-right">
-          <button className="tool-btn" onClick={() => setShowNewFolder(true)} title="Create new folder">
-            <VscNewFolder /> <span>New Folder</span>
-          </button>
-          <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Upload files">
-            <VscCloudUpload /> <span>Upload</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            onChange={handleUpload}
-          />
+          {/* Vault-specific actions */}
+          {storageMode === 'vault' && (
+            <>
+              <button className="tool-btn" onClick={() => setShowNewFolder(true)} title="Create new folder">
+                <VscNewFolder /> <span>New Folder</span>
+              </button>
+              <button className="tool-btn" onClick={() => fileInputRef.current?.click()} title="Upload files">
+                <VscCloudUpload /> <span>Upload</span>
+              </button>
+              <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleUpload} />
+            </>
+          )}
+
+          {/* Device browsing controls */}
+          {storageMode === 'device' && (
+            <button className="tool-btn primary" onClick={() => switchToVault()} title="Back to Vault">
+              <VscHome /> <span>Back to Vault</span>
+            </button>
+          )}
 
           <div className="toolbar-divider" />
 
-          {selectedItems.size === 1 && (
+          {/* Always: Open device folder */}
+          <button className="tool-btn" onClick={handleDeviceOpen} title="Browse device files">
+            <VscFolderOpened /> <span>Browse Device</span>
+          </button>
+
+          {/* Hidden folder upload input (mobile fallback) */}
+          <input
+            ref={folderInputRef}
+            type="file"
+            webkitdirectory=""
+            directory=""
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleFolderUpload}
+          />
+
+          {selectedItems.size === 1 && storageMode === 'vault' && (
             <button className="tool-btn" onClick={openRename} title="Rename">
               <VscEdit /> <span>Rename</span>
             </button>
@@ -110,9 +167,11 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
               <button className="tool-btn" onClick={handleDownloadSelected} title="Download selected">
                 <VscCloudDownload /> <span>Download</span>
               </button>
-              <button className="tool-btn" onClick={() => setShowDeleteConfirm(true)} title="Delete selected">
-                <VscTrash /> <span>Delete</span>
-              </button>
+              {storageMode === 'vault' && (
+                <button className="tool-btn" onClick={() => setShowDeleteConfirm(true)} title="Delete selected">
+                  <VscTrash /> <span>Delete</span>
+                </button>
+              )}
             </>
           )}
 
@@ -126,8 +185,6 @@ export default function Toolbar({ onMenuToggle, selectedItem }) {
           </button>
         </div>
       </div>
-
-      {/* Upload Progress / Empty state for drag-drop is handled in App.jsx */}
 
       {/* New Folder Modal */}
       {showNewFolder && (

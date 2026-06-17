@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { VscTrash, VscEdit, VscCloudDownload, VscCopy, VscFolderOpened, VscInfo } from 'react-icons/vsc';
+import { VscTrash, VscEdit, VscCloudDownload, VscFolderOpened, VscInfo } from 'react-icons/vsc';
 import { useFiles } from '../context/FileContext.jsx';
 
 export default function ContextMenu({ x, y, item, onClose }) {
-  const { delete: deleteItem, download, rename, navigate } = useFiles();
+  const { delete: deleteItem, download, rename, navigate, storageMode, navigateDeviceToSubfolder } = useFiles();
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -24,16 +24,29 @@ export default function ContextMenu({ x, y, item, onClose }) {
   const handleAction = (action) => {
     switch (action) {
       case 'open':
-        if (item.type === 'folder') navigate(item.path);
+        if (item.type === 'folder') {
+          if (storageMode === 'vault') {
+            navigate(item.path);
+          } else if (storageMode === 'device') {
+            if (item.handle?.kind === 'directory') {
+              navigateDeviceToSubfolder(item.name);
+            }
+          }
+        }
         break;
       case 'download':
         download(item.path);
         break;
       case 'rename':
-        rename(item.path, prompt('Rename to:', item.name) || item.name);
+        if (storageMode === 'vault') {
+          const newName = prompt('Rename to:', item.name);
+          if (newName) rename(item.path, newName);
+        }
         break;
       case 'delete':
-        if (confirm(`Delete "${item.name}"?`)) deleteItem(item.path);
+        if (storageMode === 'vault' && confirm(`Delete "${item.name}"?`)) {
+          deleteItem(item.path);
+        }
         break;
       default:
         break;
@@ -42,15 +55,17 @@ export default function ContextMenu({ x, y, item, onClose }) {
   };
 
   const actions = [
-    ...(item.type === 'folder'
-      ? [{ label: 'Open', icon: <VscFolderOpened />, action: 'open' }]
-      : [{ label: 'Open', icon: <VscInfo />, action: 'open' }]
-    ),
+    { label: 'Open', icon: <VscFolderOpened />, action: 'open' },
     { label: 'Download', icon: <VscCloudDownload />, action: 'download' },
-    { label: 'Rename', icon: <VscEdit />, action: 'rename' },
-    { type: 'separator' },
-    { label: 'Delete', icon: <VscTrash />, action: 'delete', danger: true },
   ];
+
+  if (storageMode === 'vault') {
+    actions.push(
+      { label: 'Rename', icon: <VscEdit />, action: 'rename' },
+      { type: 'separator' },
+      { label: 'Delete', icon: <VscTrash />, action: 'delete', danger: true }
+    );
+  }
 
   return (
     <div

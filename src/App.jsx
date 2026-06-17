@@ -10,7 +10,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const { uploadFiles } = useFiles();
+  const { uploadFiles, storageMode } = useFiles();
   const dragCounter = useRef(0);
 
   const handleContextMenu = useCallback((e, item) => {
@@ -21,31 +21,35 @@ function AppContent() {
     setContextMenu(null);
   }, []);
 
-  // Drag-and-drop upload support
+  // Drag-and-drop upload support (vault only)
   const handleDragEnter = useCallback((e) => {
+    if (storageMode !== 'vault') return;
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current++;
     if (e.dataTransfer.items?.length > 0) {
       setIsDragging(true);
     }
-  }, []);
+  }, [storageMode]);
 
   const handleDragLeave = useCallback((e) => {
+    if (storageMode !== 'vault') return;
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current--;
     if (dragCounter.current === 0) {
       setIsDragging(false);
     }
-  }, []);
+  }, [storageMode]);
 
   const handleDragOver = useCallback((e) => {
+    if (storageMode !== 'vault') return;
     e.preventDefault();
     e.stopPropagation();
-  }, []);
+  }, [storageMode]);
 
   const handleDrop = useCallback((e) => {
+    if (storageMode !== 'vault') return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -54,7 +58,7 @@ function AppContent() {
     if (files?.length > 0) {
       uploadFiles(files);
     }
-  }, [uploadFiles]);
+  }, [uploadFiles, storageMode]);
 
   return (
     <div
